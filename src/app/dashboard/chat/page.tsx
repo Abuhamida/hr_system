@@ -17,8 +17,6 @@ export default async function ChatPage() {
     .select('*')
     .eq('id', user.id)
     .single();
-console.log('Current User:', user);
-    console.log('Current Employee:', currentEmployee);
 
   if (!currentEmployee) {
     return <div>Employee profile not found</div>;

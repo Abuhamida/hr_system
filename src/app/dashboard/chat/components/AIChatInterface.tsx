@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User, Plus, Trash2, Loader2 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
-import { Database } from '@/lib/types/database';
+import { useState, useEffect, useRef } from "react";
+import { Send, Bot, User, Plus, Trash2, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { Database } from "@/lib/types/database";
 
-type Employee = Database['public']['Tables']['employees']['Row'];
-type ChatSession = Database['public']['Tables']['chat_sessions']['Row'] & {
-  chat_messages: Database['public']['Tables']['chat_messages']['Row'][];
+type Employee = Database["public"]["Tables"]["employees"]["Row"];
+type ChatSession = Database["public"]["Tables"]["chat_sessions"]["Row"] & {
+  chat_messages: Database["public"]["Tables"]["chat_messages"]["Row"][];
 };
 
 interface AIChatInterfaceProps {
@@ -17,17 +17,22 @@ interface AIChatInterfaceProps {
 
 interface ChatMessage {
   id: string;
-  sender: 'employee' | 'ai';
+  sender: "employee" | "ai";
   content: string;
   timestamp: Date;
   loading?: boolean;
 }
 
-export default function AIChatInterface({ currentEmployee, initialSessions }: AIChatInterfaceProps) {
+export default function AIChatInterface({
+  currentEmployee,
+  initialSessions,
+}: AIChatInterfaceProps) {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions);
-  const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null);
+  const [selectedSession, setSelectedSession] = useState<ChatSession | null>(
+    null
+  );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [newMessage, setNewMessage] = useState('');
+  const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -38,23 +43,25 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
     if (!currentEmployee) return;
 
     const { data: newSession, error } = await supabase
-      .from('chat_sessions')
+      .from("chat_sessions")
       .insert({
         employee_id: currentEmployee.id,
-        title: 'New Chat',
+        title: "New Chat",
       })
-      .select(`
+      .select(
+        `
         *,
         chat_messages(*)
-      `)
+      `
+      )
       .single();
 
     if (error) {
-      console.error('Error creating session:', error);
+      console.error("Error creating session:", error);
       return;
     }
 
-    setSessions(prev => [newSession, ...prev]);
+    setSessions((prev) => [newSession, ...prev]);
     setSelectedSession(newSession);
     setMessages([]);
   };
@@ -62,16 +69,15 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
   // Delete a chat session
   const deleteSession = async (sessionId: string) => {
     const { error } = await supabase
-      .from('chat_sessions')
+      .from("chat_sessions")
       .delete()
-      .eq('id', sessionId);
-
+      .eq("id", sessionId);
     if (error) {
-      console.error('Error deleting session:', error);
+      console.error("Error deleting session:", error);
       return;
     }
 
-    setSessions(prev => prev.filter(session => session.id !== sessionId));
+    setSessions((prev) => prev.filter((session) => session.id !== sessionId));
     if (selectedSession?.id === sessionId) {
       setSelectedSession(null);
       setMessages([]);
@@ -83,37 +89,37 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
     if (!newMessage.trim() || !currentEmployee || !selectedSession) return;
 
     const userMessage = newMessage.trim();
-    setNewMessage('');
+    setNewMessage("");
     setIsLoading(true);
 
     // Add user message to UI immediately
     const userMessageObj: ChatMessage = {
       id: `temp-${Date.now()}`,
-      sender: 'employee',
+      sender: "employee",
       content: userMessage,
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessageObj]);
+    setMessages((prev) => [...prev, userMessageObj]);
 
     // Add AI loading message
     const aiLoadingMessage: ChatMessage = {
       id: `loading-${Date.now()}`,
-      sender: 'ai',
-      content: '',
+      sender: "ai",
+      content: "",
       timestamp: new Date(),
       loading: true,
     };
 
-    setMessages(prev => [...prev, aiLoadingMessage]);
+    setMessages((prev) => [...prev, aiLoadingMessage]);
 
     try {
       // Save user message to database
       const { data: userMessageData, error: userMessageError } = await supabase
-        .from('chat_messages')
+        .from("chat_messages")
         .insert({
           session_id: selectedSession.id,
-          sender: 'employee',
+          sender: "employee",
           message: userMessage,
         })
         .select()
@@ -122,10 +128,10 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
       if (userMessageError) throw userMessageError;
 
       // Call AI RAG endpoint
-      const response = await fetch('/api/chat', {
-        method: 'POST',
+      const response = await fetch("/api/chat", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           message: userMessage,
@@ -135,20 +141,20 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get AI response');
+        throw new Error("Failed to get AI response");
       }
 
       const data = await response.json();
 
       // Remove loading message
-      setMessages(prev => prev.filter(msg => !msg.loading));
+      setMessages((prev) => prev.filter((msg) => !msg.loading));
 
       // Add AI response to database
       const { data: aiMessageData, error: aiMessageError } = await supabase
-        .from('chat_messages')
+        .from("chat_messages")
         .insert({
           session_id: selectedSession.id,
-          sender: 'ai',
+          sender: "ai",
           message: data.response,
         })
         .select()
@@ -159,32 +165,32 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
       // Add AI message to UI
       const aiMessageObj: ChatMessage = {
         id: aiMessageData.id,
-        sender: 'ai',
+        sender: "ai",
         content: data.response,
         timestamp: new Date(aiMessageData.created_at),
       };
 
-      setMessages(prev => [...prev, aiMessageObj]);
+      setMessages((prev) => [...prev, aiMessageObj]);
 
       // Update session title if it's the first message
       if (messages.length === 0) {
-        const title = userMessage.slice(0, 50) + (userMessage.length > 50 ? '...' : '');
+        const title =
+          userMessage.slice(0, 50) + (userMessage.length > 50 ? "..." : "");
         await supabase
-          .from('chat_sessions')
+          .from("chat_sessions")
           .update({ title })
-          .eq('id', selectedSession.id);
+          .eq("id", selectedSession.id);
       }
-
     } catch (error) {
-      console.error('Error sending message:', error);
-      
+      console.error("Error sending message:", error);
+
       // Remove loading message and show error
-      setMessages(prev => {
-        const filtered = prev.filter(msg => !msg.loading);
+      setMessages((prev) => {
+        const filtered = prev.filter((msg) => !msg.loading);
         const errorMessage: ChatMessage = {
           id: `error-${Date.now()}`,
-          sender: 'ai',
-          content: 'Sorry, I encountered an error. Please try again.',
+          sender: "ai",
+          content: "Sorry, I encountered an error. Please try again.",
           timestamp: new Date(),
         };
         return [...filtered, errorMessage];
@@ -203,17 +209,17 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
 
     const loadMessages = async () => {
       const { data: messagesData, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('session_id', selectedSession.id)
-        .order('created_at', { ascending: true });
+        .from("chat_messages")
+        .select("*")
+        .eq("session_id", selectedSession.id)
+        .order("created_at", { ascending: true });
 
       if (error) {
-        console.error('Error loading messages:', error);
+        console.error("Error loading messages:", error);
         return;
       }
 
-      const formattedMessages: ChatMessage[] = messagesData.map(msg => ({
+      const formattedMessages: ChatMessage[] = messagesData.map((msg) => ({
         id: msg.id,
         sender: msg.sender,
         content: msg.message,
@@ -231,13 +237,13 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
     if (!selectedSession) return;
 
     const channel = supabase
-      .channel('chat-messages')
+      .channel("chat-messages")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
+          event: "INSERT",
+          schema: "public",
+          table: "chat_messages",
           filter: `session_id=eq.${selectedSession.id}`,
         },
         (payload) => {
@@ -249,9 +255,9 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
             timestamp: new Date(newMessage.created_at),
           };
 
-          setMessages(prev => {
+          setMessages((prev) => {
             // Avoid duplicates
-            if (prev.some(msg => msg.id === message.id)) return prev;
+            if (prev.some((msg) => msg.id === message.id)) return prev;
             return [...prev, message];
           });
         }
@@ -265,7 +271,7 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   // Auto-select first session if none selected
@@ -294,7 +300,9 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
             <div className="p-4 text-center text-gray-500">
               <Bot className="w-12 h-12 mx-auto mb-2 text-gray-300" />
               <p>No chat history</p>
-              <p className="text-sm">Start a new conversation with the AI assistant</p>
+              <p className="text-sm">
+                Start a new conversation with the AI assistant
+              </p>
             </div>
           ) : (
             <div className="space-y-1 p-2">
@@ -303,18 +311,18 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
                   key={session.id}
                   className={`p-3 rounded-lg cursor-pointer transition-colors ${
                     selectedSession?.id === session.id
-                      ? 'bg-primary-50 border border-primary-200'
-                      : 'hover:bg-gray-50'
+                      ? "bg-primary-50 border border-primary-200"
+                      : "hover:bg-gray-50"
                   }`}
                   onClick={() => setSelectedSession(session)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-gray-900 truncate">
-                        {session.title || 'New Chat'}
+                        {session.title || "New Chat"}
                       </div>
                       <div className="text-xs text-gray-500 truncate">
-                        {session.chat_messages[0]?.message || 'No messages yet'}
+                        {session.chat_messages[0]?.message || "No messages yet"}
                       </div>
                     </div>
                     <button
@@ -345,7 +353,9 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
                   <Bot className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <div className="font-semibold text-gray-900">AI HR Assistant</div>
+                  <div className="font-semibold text-gray-900">
+                    AI HR Assistant
+                  </div>
                   <div className="text-sm text-gray-500">
                     Powered by RAG • Always learning
                   </div>
@@ -363,7 +373,8 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
                       How can I help you today?
                     </h3>
                     <p className="text-gray-600 mb-6">
-                      Ask me about HR policies, employee information, company data, or anything else related to your workplace.
+                      Ask me about HR policies, employee information, company
+                      data, or anything else related to your workplace.
                     </p>
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       {[
@@ -387,41 +398,67 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
                 messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex ${message.sender === 'employee' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex ${
+                      message.sender === "employee"
+                        ? "justify-end"
+                        : "justify-start"
+                    }`}
                   >
-                    <div className={`flex max-w-3xl ${message.sender === 'employee' ? 'flex-row-reverse' : 'flex-row'} items-start space-x-3`}>
-                      <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
-                        message.sender === 'employee' 
-                          ? 'bg-primary-600' 
-                          : 'bg-linear-to-br from-purple-500 to-blue-500'
-                      }`}>
-                        {message.sender === 'employee' ? (
+                    <div
+                      className={`flex max-w-3xl ${
+                        message.sender === "employee"
+                          ? "flex-row-reverse"
+                          : "flex-row"
+                      } items-start space-x-3`}
+                    >
+                      <div
+                        className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
+                          message.sender === "employee"
+                            ? "bg-primary-600"
+                            : "bg-linear-to-br from-purple-500 to-blue-500"
+                        }`}
+                      >
+                        {message.sender === "employee" ? (
                           <User className="w-4 h-4 text-white" />
                         ) : (
                           <Bot className="w-4 h-4 text-white" />
                         )}
                       </div>
-                      <div className={`flex-1 ${message.sender === 'employee' ? 'text-right' : 'text-left'}`}>
-                        <div className={`inline-block px-4 py-2 rounded-2xl ${
-                          message.sender === 'employee'
-                            ? 'bg-primary-600 text-white'
-                            : 'bg-gray-100 text-gray-900'
-                        }`}>
+                      <div
+                        className={`flex-1 ${
+                          message.sender === "employee"
+                            ? "text-right"
+                            : "text-left"
+                        }`}
+                      >
+                        <div
+                          className={`inline-block px-4 py-2 rounded-2xl ${
+                            message.sender === "employee"
+                              ? "bg-primary-600 text-white"
+                              : "bg-gray-100 text-gray-900"
+                          }`}
+                        >
                           {message.loading ? (
                             <div className="flex items-center space-x-2">
                               <Loader2 className="w-4 h-4 animate-spin" />
                               <span>AI is thinking...</span>
                             </div>
                           ) : (
-                            <div className="whitespace-pre-wrap">{message.content}</div>
+                            <div className="whitespace-pre-wrap">
+                              {message.content}
+                            </div>
                           )}
                         </div>
-                        <div className={`text-xs text-gray-500 mt-1 ${
-                          message.sender === 'employee' ? 'text-right' : 'text-left'
-                        }`}>
-                          {message.timestamp.toLocaleTimeString([], { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
+                        <div
+                          className={`text-xs text-gray-500 mt-1 ${
+                            message.sender === "employee"
+                              ? "text-right"
+                              : "text-left"
+                          }`}
+                        >
+                          {message.timestamp.toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
                           })}
                         </div>
                       </div>
@@ -439,7 +476,9 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
                   type="text"
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && !isLoading && sendMessage()}
+                  onKeyPress={(e) =>
+                    e.key === "Enter" && !isLoading && sendMessage()
+                  }
                   placeholder="Ask about HR policies, employee data, or company information..."
                   disabled={isLoading}
                   className="input-primary flex-1"
@@ -458,7 +497,8 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
                 </button>
               </div>
               <div className="text-xs text-gray-500 mt-2 text-center">
-                AI assistant may produce inaccurate information about people, places, or facts
+                AI assistant may produce inaccurate information about people,
+                places, or facts
               </div>
             </div>
           </>
