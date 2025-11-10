@@ -11,7 +11,7 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Auth callback error:', error)
-      return NextResponse.redirect(`${requestUrl.origin}/auth/login?error=auth_callback_failed`)
+      return NextResponse.redirect(`${requestUrl.origin}/login?error=auth_callback_failed`)
     }
 
     if (user) {
