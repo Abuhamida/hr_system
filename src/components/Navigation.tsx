@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, BarChart3 } from 'lucide-react';
-
+import { Menu, X, BarChart3  } from 'lucide-react';
+import Link from 'next/link';
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -34,9 +34,9 @@ const Navigation = () => {
               About
             </a>
             <div className="flex items-center gap-4">
-              <button className="text-gray-700 hover:text-primary-600 font-medium transition-colors">
+              <Link href='/login' className="text-gray-700 hover:text-primary-600 font-medium transition-colors">
                 Sign In
-              </button>
+              </Link>
               <button className="btn-primary">
                 Get Started
               </button>
