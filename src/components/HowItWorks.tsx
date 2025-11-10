@@ -38,7 +38,7 @@ const HowItWorks = () => {
   ];
 
   return (
-    <section className="py-20 bg-gradient-to-br from-gray-50 to-primary-50">
+    <section className="py-20 bg-linear-to-br from-gray-50 to-primary-50">
       <div className="container-custom section-padding">
         <motion.div
           ref={ref}
