@@ -47,7 +47,7 @@ export default function DashboardSidebar() {
             <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
             <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white">
               <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-                <div className="flex-shrink-0 flex items-center px-4">
+                <div className="shrink-0 flex items-center px-4">
                   <h1 className="text-xl font-bold text-gray-900">HR Analytics</h1>
                   <button
                     onClick={() => setSidebarOpen(false)}
@@ -70,7 +70,7 @@ export default function DashboardSidebar() {
                         }`}
                         onClick={() => setSidebarOpen(false)}
                       >
-                        <item.icon className={`mr-4 flex-shrink-0 h-6 w-6 ${
+                        <item.icon className={`mr-4 shrink-0 h-6 w-6 ${
                           isActive ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-500'
                         }`} />
                         {item.name}
@@ -85,10 +85,10 @@ export default function DashboardSidebar() {
       </div>
 
       {/* Desktop sidebar */}
-      <div className="hidden lg:flex lg:flex-shrink-0">
+      <div className="hidden lg:flex lg:shrink-0">
         <div className="flex flex-col w-64">
-          <div className="flex flex-col flex-grow bg-white border-r border-gray-200 pt-5 pb-4 overflow-y-auto">
-            <div className="flex items-center flex-shrink-0 px-4">
+          <div className="flex flex-col grow bg-white border-r border-gray-200 pt-5 pb-4 overflow-y-auto">
+            <div className="flex items-center shrink-0 px-4">
               <h1 className="text-xl font-bold text-gray-900">HR Analytics</h1>
             </div>
             <nav className="mt-5 flex-1 flex flex-col divide-y divide-gray-200 overflow-y-auto">
@@ -105,7 +105,7 @@ export default function DashboardSidebar() {
                           : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                       }`}
                     >
-                      <item.icon className={`mr-3 flex-shrink-0 h-6 w-6 ${
+                      <item.icon className={`mr-3 shrink-0 h-6 w-6 ${
                         isActive ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-500'
                       }`} />
                       {item.name}

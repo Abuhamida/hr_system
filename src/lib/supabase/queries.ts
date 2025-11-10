@@ -122,16 +122,19 @@ export async function getAttritionPredictions(): Promise<HighRiskEmployee[]> {
     if (error) throw error
 
     // Transform data to match HighRiskEmployee interface
-    return (data || []).map(item => ({
-      id: item.id,
-      risk_level: item.risk_category,
-      prediction_date: item.prediction_date,
-      employees: {
-        first_name: item.employees?.first_name || 'Unknown',
-        last_name: item.employees?.last_name || 'Employee',
-        job_roles: item.employees?.job_roles || null
+    return (data || []).map((item: any) => {
+      const emp = Array.isArray(item.employees) ? item.employees[0] : item.employees
+      return {
+        id: item.id,
+        risk_level: item.risk_category,
+        prediction_date: item.prediction_date,
+        employees: {
+          first_name: emp?.first_name || 'Unknown',
+          last_name: emp?.last_name || 'Employee',
+          job_roles: emp?.job_roles || null
+        }
       }
-    }))
+    })
   } catch (error) {
     console.error('Error fetching attrition predictions:', error)
     return []

@@ -5,7 +5,7 @@ import { ArrowRight, BarChart3, Brain, Shield } from 'lucide-react';
 
 const Hero = () => {
   return (
-    <section className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-secondary-50 overflow-hidden">
+    <section className="relative min-h-screen flex items-center justify-center bg-linear-to-br from-primary-50 via-white to-secondary-50 overflow-hidden">
       {/* Background decorations */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float"></div>
