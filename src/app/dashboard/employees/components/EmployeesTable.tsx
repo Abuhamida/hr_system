@@ -114,7 +114,7 @@ export default function EmployeesTable({ employees, departments, jobRoles }: Emp
               <tr key={employee.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
-                    <div className="flex-shrink-0 h-10 w-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                    <div className="shrink-0 h-10 w-10 bg-primary-100 rounded-lg flex items-center justify-center">
                       <span className="text-primary-700 font-medium">
                         {employee.first_name[0]}{employee.last_name[0]}
                       </span>

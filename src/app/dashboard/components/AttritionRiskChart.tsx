@@ -13,10 +13,12 @@ export default function AttritionRiskChart({ data }: AttritionRiskChartProps) {
   // Process data for chart
   const riskData = data.reduce((acc, prediction) => {
     const riskLevel = prediction.risk_level;
-    if (!acc[riskLevel]) {
-      acc[riskLevel] = 0;
+    if (typeof riskLevel === 'string') {
+      if (!acc[riskLevel]) {
+        acc[riskLevel] = 0;
+      }
+      acc[riskLevel]++;
     }
-    acc[riskLevel]++;
     return acc;
   }, {} as Record<string, number>);
 

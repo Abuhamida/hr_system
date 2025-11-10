@@ -341,7 +341,7 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
             {/* Chat Header */}
             <div className="p-4 border-b border-gray-200">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-linear-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
                   <Bot className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -390,10 +390,10 @@ export default function AIChatInterface({ currentEmployee, initialSessions }: AI
                     className={`flex ${message.sender === 'employee' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div className={`flex max-w-3xl ${message.sender === 'employee' ? 'flex-row-reverse' : 'flex-row'} items-start space-x-3`}>
-                      <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
+                      <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
                         message.sender === 'employee' 
                           ? 'bg-primary-600' 
-                          : 'bg-gradient-to-br from-purple-500 to-blue-500'
+                          : 'bg-linear-to-br from-purple-500 to-blue-500'
                       }`}>
                         {message.sender === 'employee' ? (
                           <User className="w-4 h-4 text-white" />

@@ -217,7 +217,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right side - Illustration */}
-      <div className="hidden lg:block relative flex-1 bg-gradient-to-br from-primary-600 to-primary-800">
+      <div className="hidden lg:block relative flex-1 bg-linear-to-br from-primary-600 to-primary-800">
         <div className="absolute inset-0 bg-pattern opacity-10"></div>
         <div className="flex items-center justify-center h-full">
           <div className="max-w-lg text-center text-white p-8">

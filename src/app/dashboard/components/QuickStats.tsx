@@ -66,7 +66,7 @@ export default function QuickStats({ employees, attritionData }: QuickStatsProps
         return (
           <div key={stat.name} className="bg-white overflow-hidden rounded-xl border border-gray-200 p-6">
             <div className="flex items-center">
-              <div className="flex-shrink-0">
+              <div className="shrink-0">
                 <div className={`w-12 h-12 rounded-lg ${colorClasses} flex items-center justify-center`}>
                   <Icon className="w-6 h-6" />
                 </div>
