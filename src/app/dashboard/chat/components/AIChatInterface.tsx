@@ -1,23 +1,21 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef } from "react";
-import { Send, Bot, User, Plus, Trash2, Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { Database } from "@/lib/types/database";
-
-type Employee = Database["public"]["Tables"]["employees"]["Row"];
-type ChatSession = Database["public"]["Tables"]["chat_sessions"]["Row"] & {
-  chat_messages: Database["public"]["Tables"]["chat_messages"]["Row"][];
-};
+import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Send, Bot, User, Plus, Trash2, Loader2, Brain } from 'lucide-react';
+import type { Employee, ChatSession, ChatMessage as ChatMessageType } from '@/lib/types';
+import { getChatbotResponse } from '@/services/geminiService';
+import { createClient } from '@/lib/supabase/client';
 
 interface AIChatInterfaceProps {
   currentEmployee: Employee | null;
   initialSessions: ChatSession[];
+  employees: Employee[];
 }
 
 interface ChatMessage {
   id: string;
-  sender: "employee" | "ai";
+  sender: 'user' | 'ai';
   content: string;
   timestamp: Date;
   loading?: boolean;
@@ -26,17 +24,25 @@ interface ChatMessage {
 export default function AIChatInterface({
   currentEmployee,
   initialSessions,
+  employees,
 }: AIChatInterfaceProps) {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions);
-  const [selectedSession, setSelectedSession] = useState<ChatSession | null>(
-    null
-  );
+  const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const supabase = createClient();
+
+  // Initialize chat session
+  useEffect(() => {
+    if (sessions.length > 0 && !selectedSession) {
+      setSelectedSession(sessions[0]);
+    }
+    setIsInitializing(false);
+  }, [sessions, selectedSession]);
 
   // Create a new chat session
   const createNewSession = async () => {
@@ -48,12 +54,10 @@ export default function AIChatInterface({
         employee_id: currentEmployee.id,
         title: "New Chat",
       })
-      .select(
-        `
+      .select(`
         *,
         chat_messages(*)
-      `
-      )
+      `)
       .single();
 
     if (error) {
@@ -72,6 +76,7 @@ export default function AIChatInterface({
       .from("chat_sessions")
       .delete()
       .eq("id", sessionId);
+
     if (error) {
       console.error("Error deleting session:", error);
       return;
@@ -79,8 +84,7 @@ export default function AIChatInterface({
 
     setSessions((prev) => prev.filter((session) => session.id !== sessionId));
     if (selectedSession?.id === sessionId) {
-      setSelectedSession(null);
-      setMessages([]);
+      setSelectedSession(sessions.find(s => s.id !== sessionId) || null);
     }
   };
 
@@ -95,17 +99,32 @@ export default function AIChatInterface({
     // Add user message to UI immediately
     const userMessageObj: ChatMessage = {
       id: `temp-${Date.now()}`,
-      sender: "employee",
+      sender: 'user',
       content: userMessage,
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessageObj]);
 
+    // Save user message to database
+    const { data: userMessageData, error: userMessageError } = await supabase
+      .from("chat_messages")
+      .insert({
+        session_id: selectedSession.id,
+        sender: 'user',
+        message: userMessage,
+      })
+      .select()
+      .single();
+
+    if (userMessageError) {
+      console.error("Error saving user message:", userMessageError);
+    }
+
     // Add AI loading message
     const aiLoadingMessage: ChatMessage = {
       id: `loading-${Date.now()}`,
-      sender: "ai",
+      sender: 'ai',
       content: "",
       timestamp: new Date(),
       loading: true,
@@ -114,37 +133,8 @@ export default function AIChatInterface({
     setMessages((prev) => [...prev, aiLoadingMessage]);
 
     try {
-      // Save user message to database
-      const { data: userMessageData, error: userMessageError } = await supabase
-        .from("chat_messages")
-        .insert({
-          session_id: selectedSession.id,
-          sender: "employee",
-          message: userMessage,
-        })
-        .select()
-        .single();
-
-      if (userMessageError) throw userMessageError;
-
-      // Call AI RAG endpoint
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: userMessage,
-          sessionId: selectedSession.id,
-          employeeId: currentEmployee.id,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to get AI response");
-      }
-
-      const data = await response.json();
+      // Get AI response using your existing service
+      const response = await getChatbotResponse(userMessage, employees);
 
       // Remove loading message
       setMessages((prev) => prev.filter((msg) => !msg.loading));
@@ -154,8 +144,8 @@ export default function AIChatInterface({
         .from("chat_messages")
         .insert({
           session_id: selectedSession.id,
-          sender: "ai",
-          message: data.response,
+          sender: 'ai',
+          message: response,
         })
         .select()
         .single();
@@ -165,8 +155,8 @@ export default function AIChatInterface({
       // Add AI message to UI
       const aiMessageObj: ChatMessage = {
         id: aiMessageData.id,
-        sender: "ai",
-        content: data.response,
+        sender: 'ai',
+        content: response,
         timestamp: new Date(aiMessageData.created_at),
       };
 
@@ -174,8 +164,7 @@ export default function AIChatInterface({
 
       // Update session title if it's the first message
       if (messages.length === 0) {
-        const title =
-          userMessage.slice(0, 50) + (userMessage.length > 50 ? "..." : "");
+        const title = userMessage.slice(0, 50) + (userMessage.length > 50 ? "..." : "");
         await supabase
           .from("chat_sessions")
           .update({ title })
@@ -189,7 +178,7 @@ export default function AIChatInterface({
         const filtered = prev.filter((msg) => !msg.loading);
         const errorMessage: ChatMessage = {
           id: `error-${Date.now()}`,
-          sender: "ai",
+          sender: 'ai',
           content: "Sorry, I encountered an error. Please try again.",
           timestamp: new Date(),
         };
@@ -221,7 +210,7 @@ export default function AIChatInterface({
 
       const formattedMessages: ChatMessage[] = messagesData.map((msg) => ({
         id: msg.id,
-        sender: msg.sender,
+        sender: msg.sender as 'user' | 'ai',
         content: msg.message,
         timestamp: new Date(msg.created_at),
       }));
@@ -232,67 +221,47 @@ export default function AIChatInterface({
     loadMessages();
   }, [selectedSession, supabase]);
 
-  // Real-time subscription for new messages
-  useEffect(() => {
-    if (!selectedSession) return;
-
-    const channel = supabase
-      .channel("chat-messages")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "chat_messages",
-          filter: `session_id=eq.${selectedSession.id}`,
-        },
-        (payload) => {
-          const newMessage = payload.new;
-          const message: ChatMessage = {
-            id: newMessage.id,
-            sender: newMessage.sender,
-            content: newMessage.message,
-            timestamp: new Date(newMessage.created_at),
-          };
-
-          setMessages((prev) => {
-            // Avoid duplicates
-            if (prev.some((msg) => msg.id === message.id)) return prev;
-            return [...prev, message];
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedSession, supabase]);
-
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Auto-select first session if none selected
-  useEffect(() => {
-    if (sessions.length > 0 && !selectedSession) {
-      setSelectedSession(sessions[0]);
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (!isLoading) {
+        sendMessage();
+      }
     }
-  }, [sessions, selectedSession]);
+  };
+
+  if (isInitializing) {
+    return (
+      <div className="bg-white/70 backdrop-blur-sm rounded-xl border border-gray-200 shadow-md flex flex-col h-[calc(100vh-12rem)]">
+        <div className="flex-grow flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 text-primary-600 animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Initializing chat...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-[calc(100vh-12rem)] bg-white rounded-xl border border-gray-200">
+    <div className="flex h-[calc(100vh-12rem)] bg-white/70 backdrop-blur-sm rounded-xl border border-gray-200 shadow-md">
       {/* Sidebar - Chat History */}
       <div className="w-80 border-r border-gray-200 flex flex-col">
         <div className="p-4 border-b border-gray-200">
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={createNewSession}
             className="w-full btn-primary flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
             New Chat
-          </button>
+          </motion.button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -307,8 +276,10 @@ export default function AIChatInterface({
           ) : (
             <div className="space-y-1 p-2">
               {sessions.map((session) => (
-                <div
+                <motion.div
                   key={session.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
                   className={`p-3 rounded-lg cursor-pointer transition-colors ${
                     selectedSession?.id === session.id
                       ? "bg-primary-50 border border-primary-200"
@@ -321,9 +292,9 @@ export default function AIChatInterface({
                       <div className="font-medium text-gray-900 truncate">
                         {session.title || "New Chat"}
                       </div>
-                      <div className="text-xs text-gray-500 truncate">
-                        {session.chat_messages[0]?.message || "No messages yet"}
-                      </div>
+                      {/* <div className="text-xs text-gray-500 truncate">
+                        {session.chat_messages?.[0]?.message || "No messages yet"}
+                      </div> */}
                     </div>
                     <button
                       onClick={(e) => {
@@ -335,7 +306,7 @@ export default function AIChatInterface({
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           )}
@@ -347,159 +318,133 @@ export default function AIChatInterface({
         {selectedSession ? (
           <>
             {/* Chat Header */}
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-linear-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
-                  <Bot className="w-5 h-5 text-white" />
+            <div className="p-6 border-b border-gray-200">
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-3"
+              >
+                <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                  <Brain className="w-5 h-5 text-primary-600" />
                 </div>
                 <div>
-                  <div className="font-semibold text-gray-900">
-                    AI HR Assistant
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Powered by RAG • Always learning
-                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">HR AI Agent</h3>
+                  <p className="text-sm text-gray-600">Ask me anything about your employee data</p>
                 </div>
-              </div>
+              </motion.div>
             </div>
 
             {/* Messages Container */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
-              {messages.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center max-w-md">
-                    <Bot className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      How can I help you today?
-                    </h3>
-                    <p className="text-gray-600 mb-6">
-                      Ask me about HR policies, employee information, company
-                      data, or anything else related to your workplace.
-                    </p>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      {[
-                        "What's our remote work policy?",
-                        "Show me team performance metrics",
-                        "Explain our vacation policy",
-                        "Who are the new hires this month?",
-                      ].map((suggestion, index) => (
-                        <button
-                          key={index}
-                          onClick={() => setNewMessage(suggestion)}
-                          className="p-3 text-left bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                        >
-                          {suggestion}
-                        </button>
-                      ))}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-6">
+                {messages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center max-w-md">
+                      <Bot className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        How can I help you today?
+                      </h3>
+                      <p className="text-gray-600 mb-6">
+                        Ask me about HR policies, employee information, company data, or anything else related to your workplace.
+                      </p>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        {[
+                          "List employees with attrition risk",
+                          "Show employee performance rankings",
+                          "Get details for employee #1001",
+                          "Suggest HR actions for my team",
+                        ].map((suggestion, index) => (
+                          <motion.button
+                            key={index}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => setNewMessage(suggestion)}
+                            className="p-3 text-left bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                          >
+                            {suggestion}
+                          </motion.button>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${
-                      message.sender === "employee"
-                        ? "justify-end"
-                        : "justify-start"
-                    }`}
-                  >
-                    <div
-                      className={`flex max-w-3xl ${
-                        message.sender === "employee"
-                          ? "flex-row-reverse"
-                          : "flex-row"
-                      } items-start space-x-3`}
+                ) : (
+                  messages.map((message, index) => (
+                    <motion.div
+                      key={message.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.1 }}
+                      className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div
-                        className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
-                          message.sender === "employee"
-                            ? "bg-primary-600"
-                            : "bg-linear-to-br from-purple-500 to-blue-500"
-                        }`}
-                      >
-                        {message.sender === "employee" ? (
-                          <User className="w-4 h-4 text-white" />
-                        ) : (
-                          <Bot className="w-4 h-4 text-white" />
-                        )}
-                      </div>
-                      <div
-                        className={`flex-1 ${
-                          message.sender === "employee"
-                            ? "text-right"
-                            : "text-left"
-                        }`}
-                      >
-                        <div
-                          className={`inline-block px-4 py-2 rounded-2xl ${
-                            message.sender === "employee"
-                              ? "bg-primary-600 text-white"
-                              : "bg-gray-100 text-gray-900"
-                          }`}
-                        >
-                          {message.loading ? (
-                            <div className="flex items-center space-x-2">
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>AI is thinking...</span>
-                            </div>
+                      <div className={`flex gap-3 max-w-xs md:max-w-md lg:max-w-lg ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          message.sender === 'user' ? 'bg-primary-600' : 'bg-gray-200'
+                        }`}>
+                          {message.sender === 'user' ? (
+                            <User className="w-4 h-4 text-white" />
                           ) : (
-                            <div className="whitespace-pre-wrap">
-                              {message.content}
-                            </div>
+                            <Bot className="w-4 h-4 text-gray-600" />
                           )}
                         </div>
-                        <div
-                          className={`text-xs text-gray-500 mt-1 ${
-                            message.sender === "employee"
-                              ? "text-right"
-                              : "text-left"
-                          }`}
-                        >
-                          {message.timestamp.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                        <div className={`px-4 py-3 rounded-2xl ${
+                          message.sender === 'user' 
+                            ? 'bg-primary-600 text-white rounded-br-none' 
+                            : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                        }`}>
+                          {message.loading ? (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse"></div>
+                              <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse delay-75"></div>
+                              <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse delay-150"></div>
+                            </div>
+                          ) : (
+                            <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  </div>
-                ))
-              )}
-              <div ref={messagesEndRef} />
+                    </motion.div>
+                  ))
+                )}
+                <div ref={messagesEndRef} />
+              </div>
             </div>
 
             {/* Message Input */}
-            <div className="p-4 border-t border-gray-200">
-              <div className="flex space-x-4">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) =>
-                    e.key === "Enter" && !isLoading && sendMessage()
-                  }
-                  placeholder="Ask about HR policies, employee data, or company information..."
-                  disabled={isLoading}
-                  className="input-primary flex-1"
-                />
-                <button
+            <div className="p-6 border-t border-gray-200">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-end gap-3"
+              >
+                <div className="flex-grow relative">
+                  <textarea
+                    rows={1}
+                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-gray-50 dark:border-gray-200 dark:text-gray-900 resize-none"
+                    placeholder="e.g., 'List employees with attrition risk'"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    disabled={isLoading}
+                    style={{
+                      minHeight: '48px',
+                      maxHeight: '120px',
+                    }}
+                  />
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={sendMessage}
-                  disabled={!newMessage.trim() || isLoading}
-                  className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-3 bg-primary-600 text-white rounded-2xl hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:bg-primary-300 disabled:cursor-not-allowed transition-colors"
+                  disabled={isLoading || newMessage.trim() === ''}
                 >
                   {isLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
-                    <Send className="w-4 h-4" />
+                    <Send className="w-5 h-5" />
                   )}
-                  Send
-                </button>
-              </div>
-              <div className="text-xs text-gray-500 mt-2 text-center">
-                AI assistant may produce inaccurate information about people,
-                places, or facts
-              </div>
+                </motion.button>
+              </motion.div>
             </div>
           </>
         ) : (

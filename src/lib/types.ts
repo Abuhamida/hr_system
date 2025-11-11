@@ -1,91 +1,70 @@
+// Employee type matching Supabase schema
 export interface Employee {
-  id: string;
-  auth_user_id: string;
-  company_id: string;
-  department_id?: string;
-  job_role_id?: string;
-  employee_id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone?: string;
-  hire_date: string;
-  termination_date?: string;
-  salary?: number;
-  employment_type: 'full_time' | 'part_time' | 'contract' | 'intern';
-  status: 'active' | 'on_leave' | 'terminated' | 'resigned';
-  manager_id?: string;
-  date_of_birth?: string;
-  gender?: string;
-  emergency_contact_name?: string;
-  emergency_contact_phone?: string;
+  id: string; // same as auth.user.id
+  employee_number: number;
+  first_name: string | null;
+  last_name: string | null;
+  gender: string | null;
+  age: number | null;
+  department: string | null;
+  education: number | null;
+  education_field: string | null;
+  job_role: string | null;
+  job_level: number | null;
+  job_involvement: number | null;
+  job_satisfaction: number | null;
+  marital_status: string | null;
+  business_travel: string | null;
+  over_time: boolean | null;
+  monthly_income: number | null;
+  daily_rate: number | null;
+  hourly_rate: number | null;
+  years_at_company: number | null;
+  total_working_years: number | null;
+  performance_rating: number | null;
+  environment_satisfaction: number | null;
+  relationship_satisfaction: number | null;
+  work_life_balance: number | null;
+  distance_from_home: number | null;
+  num_companies_worked: number | null;
+  percent_salary_hike: number | null;
+  training_times_last_year: number | null;
+  years_with_curr_manager: number | null;
+  years_since_last_promotion: number | null;
+  attrition: boolean | null;
+  phone:string | null;
+  address:string | null;
   created_at: string;
-  updated_at: string;
-  department?: Department;
-  job_role?: JobRole;
-  manager?: Employee;
 }
 
-export interface Department {
-  id: string;
-  company_id: string;
-  name: string;
-  description?: string;
-  manager_id?: string;
-  budget?: number;
-  created_at: string;
-  updated_at: string;
-  manager?: Employee;
-}
-
-export interface JobRole {
-  id: string;
-  department_id: string;
-  title: string;
-  description?: string;
-  salary_range_min?: number;
-  salary_range_max?: number;
-  requirements?: string;
-  created_at: string;
-  updated_at: string;
-  department?: Department;
-}
-
-export interface AttritionPrediction {
-  id: string;
-  employee_id: string;
-  prediction_date: string;
-  attrition_probability: number;
-  prediction: boolean;
-  confidence_level: number;
-  risk_level: 'low' | 'medium' | 'high' | 'critical';
-  explanation?: string;
-  model_version: string;
-  created_at: string;
-  employee?: Employee;
-}
-
+// Chat session type
 export interface ChatSession {
   id: string;
-  title?: string;
-  participant1_id: string;
-  participant2_id: string;
-  session_type: 'direct' | 'group' | 'support';
-  last_message_at?: string;
+  employee_id: string;
+  title: string;
   created_at: string;
-  updated_at: string;
-  participant1?: Employee;
-  participant2?: Employee;
-  last_message?: ChatMessage;
 }
 
+// Chat message type
 export interface ChatMessage {
   id: string;
-  chat_session_id: string;
-  sender_id: string;
-  message_text: string;
-  message_type: 'text' | 'file' | 'system';
-  read_at?: string;
+  session_id: string;
+  sender: 'user' | 'ai';
+  message: string;
   created_at: string;
-  sender?: Employee;
 }
+
+// Knowledge base entry type (for RAG)
+export interface KnowledgeBaseEntry {
+  id: string;
+  content: string;
+  embedding: number[]; // vector(1536)
+  metadata: Record<string, any>;
+  created_at: string;
+}
+
+// Utility type for insert/update operations
+export type InsertEmployee = Omit<Employee, 'id' | 'created_at'>;
+export type InsertChatSession = Omit<ChatSession, 'id' | 'created_at'>;
+export type InsertChatMessage = Omit<ChatMessage, 'id' | 'created_at'>;
+export type InsertKnowledgeBaseEntry = Omit<KnowledgeBaseEntry, 'id' | 'created_at'>;
