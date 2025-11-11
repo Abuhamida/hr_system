@@ -63,6 +63,11 @@ export interface KnowledgeBaseEntry {
   created_at: string;
 }
 
+export interface FunctionCall {
+  name: string;
+  args: Record<string, any>;
+}
+
 // Utility type for insert/update operations
 export type InsertEmployee = Omit<Employee, 'id' | 'created_at'>;
 export type InsertChatSession = Omit<ChatSession, 'id' | 'created_at'>;

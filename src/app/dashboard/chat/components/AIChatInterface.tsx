@@ -134,7 +134,7 @@ export default function AIChatInterface({
 
     try {
       // Get AI response using your existing service
-      const response = await getChatbotResponse(userMessage, employees);
+      const response = await getChatbotResponse.getResponse(userMessage, employees);
 
       // Remove loading message
       setMessages((prev) => prev.filter((msg) => !msg.loading));
