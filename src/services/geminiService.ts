@@ -3,18 +3,34 @@ import type { Employee } from "@/lib/types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
 
+// Define proper types for the function declarations
+interface FunctionDeclaration {
+  name: string;
+  description: string;
+  parameters?: {
+    type: Type;
+    properties: Record<string, Schema>;
+    required: string[];
+  };
+}
+
+interface Schema {
+  type: Type;
+  description: string;
+  enum?: string[];
+}
+
 const tools = [
   {
     functionDeclarations: [
       {
         name: "get_attrition_employees",
-        description:
-          "Get a list of all employees who have left the company (attrition is true).",
+        description: "Get a list of all employees who have left the company (attrition is true).",
+        // No parameters needed for this function
       },
       {
         name: "get_employee_details",
-        description:
-          "Get the full details for a specific employee by their employee number.",
+        description: "Get the full details for a specific employee by their employee number.",
         parameters: {
           type: Type.OBJECT,
           properties: {
@@ -28,20 +44,18 @@ const tools = [
       },
       {
         name: "rank_employees",
-        description:
-          "Rank employees based on a specific criterion like performance_rating, job_satisfaction, or monthly_income.",
+        description: "Rank employees based on a specific criterion like performance_rating, job_satisfaction, or monthly_income.",
         parameters: {
           type: Type.OBJECT,
           properties: {
             criteria: {
               type: Type.STRING,
-              description:
-                "The field to rank by (e.g., 'performance_rating', 'monthly_income', 'job_satisfaction').",
+              description: "The field to rank by (e.g., 'performance_rating', 'monthly_income', 'job_satisfaction').",
             },
             order: {
               type: Type.STRING,
-              description:
-                "The sort order: 'asc' for ascending, 'desc' for descending. Defaults to 'desc'.",
+              description: "The sort order: 'asc' for ascending, 'desc' for descending. Defaults to 'desc'.",
+              enum: ["asc", "desc"],
             },
             limit: {
               type: Type.INTEGER,
@@ -53,8 +67,7 @@ const tools = [
       },
       {
         name: "suggest_action_for_employee",
-        description:
-          "Analyze an employee's data and suggest a data-driven HR action (e.g., promotion, training, performance review).",
+        description: "Analyze an employee's data and suggest a data-driven HR action (e.g., promotion, training, performance review).",
         parameters: {
           type: Type.OBJECT,
           properties: {
@@ -66,7 +79,7 @@ const tools = [
           required: ["employee_number"],
         },
       },
-    ],
+    ] as FunctionDeclaration[],
   },
 ];
 
@@ -212,30 +225,47 @@ export const getChatbotResponse = async (
       const functionResponseParts: object[] = [];
 
       for (const call of calls) {
+        // Validate that call.args exists
+        if (!call.args) {
+          functionResponseParts.push({
+            functionResponse: {
+              name: call.name,
+              response: { content: { error: `Missing arguments for function ${call.name}` } },
+            },
+          });
+          continue;
+        }
+
         let result: any;
         switch (call.name) {
           case "get_attrition_employees":
             result = getAttritionEmployees(employees);
             break;
           case "get_employee_details":
-            result = getEmployeeDetails(
-              employees,
-              call.args.employee_number as number
-            );
+            // Validate required argument exists
+            if (typeof call.args.employee_number !== 'number') {
+              result = { error: `Missing or invalid employee_number for ${call.name}` };
+            } else {
+              result = getEmployeeDetails(employees, call.args.employee_number);
+            }
             break;
           case "rank_employees":
-            result = rankEmployees(
-              employees,
-              call.args.criteria as keyof Employee,
-              call.args.order as "asc" | "desc",
-              call.args.limit as number
-            );
+            // Validate required argument exists
+            if (typeof call.args.criteria !== 'string') {
+              result = { error: `Missing or invalid criteria for ${call.name}` };
+            } else {
+              const order = call.args.order === 'asc' ? 'asc' : 'desc';
+              const limit = typeof call.args.limit === 'number' ? call.args.limit : 5;
+              result = rankEmployees(employees, call.args.criteria as keyof Employee, order, limit);
+            }
             break;
           case "suggest_action_for_employee":
-            result = suggestActionForEmployee(
-              employees,
-              call.args.employee_number as number
-            );
+            // Validate required argument exists
+            if (typeof call.args.employee_number !== 'number') {
+              result = { error: `Missing or invalid employee_number for ${call.name}` };
+            } else {
+              result = suggestActionForEmployee(employees, call.args.employee_number);
+            }
             break;
           default:
             result = { error: `Function ${call.name} not found.` };
@@ -252,7 +282,7 @@ export const getChatbotResponse = async (
       response = await chat.sendMessage({ message: functionResponseParts });
     }
 
-    return response.text;
+    return response.text ?? "";
   } catch (error) {
     console.error("Error calling Gemini API:", error);
     return "Sorry, I encountered an error. The model might be unable to use the tools correctly for this query. Please try rephrasing your question.";
