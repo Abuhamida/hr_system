@@ -1,6 +1,5 @@
 import type { Employee, FunctionCall } from "@/lib/types";
 import * as implementations from "./implementations";
-
 export const executeTool = (call: FunctionCall, employees: Employee[]) => {
   const { name, args } = call;
 
@@ -158,6 +157,106 @@ export const executeTool = (call: FunctionCall, employees: Employee[]) => {
         const department =
           typeof args.department === "string" ? args.department : undefined;
         return implementations.getPromotionAnalytics(employees, department);
+
+      // Insight Generation Tools
+      case "generate_performance_insights":
+        const performanceFocusDept =
+          typeof args.focus_department === "string"
+            ? args.focus_department
+            : undefined;
+        const analysisType =
+          typeof args.analysis_type === "string"
+            ? args.analysis_type
+            : "trends";
+        return implementations.generatePerformanceInsights(
+          employees,
+          performanceFocusDept,
+          analysisType
+        );
+
+      case "generate_attrition_insights":
+        const depth =
+          typeof args.depth === "string" ? args.depth : "comprehensive";
+        return implementations.generateAttritionInsights(employees, depth);
+
+      case "generate_training_impact_insights":
+        const minTraining =
+          typeof args.min_training_sessions === "number"
+            ? args.min_training_sessions
+            : 2;
+        return implementations.generateTrainingImpactInsights(
+          employees,
+          minTraining
+        );
+
+      case "generate_comprehensive_hr_report":
+        const reportType =
+          typeof args.report_type === "string" ? args.report_type : "executive";
+        return implementations.generateComprehensiveHRReport(
+          employees,
+          reportType
+        );
+
+      // Chart Generation Tools
+      case "generate_performance_charts":
+        if (
+          typeof args.chart_type !== "string" ||
+          typeof args.metric !== "string"
+        ) {
+          return { error: "Missing or invalid chart_type or metric" };
+        }
+        return implementations.generatePerformanceCharts(
+          employees,
+          args.chart_type,
+          args.metric
+        );
+
+      case "generate_department_comparison_chart":
+        if (!Array.isArray(args.metrics) || args.metrics.length === 0) {
+          return { error: "Missing or invalid metrics array" };
+        }
+        const chartStyle =
+          typeof args.chart_style === "string"
+            ? args.chart_style
+            : "side_by_side";
+        return implementations.generateDepartmentComparisonChart(
+          employees,
+          args.metrics,
+          chartStyle
+        );
+
+      case "generate_attrition_analysis_chart":
+        if (typeof args.analysis_type !== "string") {
+          return { error: "Missing or invalid analysis_type" };
+        }
+        return implementations.generateAttritionAnalysisChart(
+          employees,
+          args.analysis_type
+        );
+
+      case "generate_training_impact_chart":
+        if (typeof args.visualization_type !== "string") {
+          return { error: "Missing or invalid visualization_type" };
+        }
+        return implementations.generateTrainingImpactChart(
+          employees,
+          args.visualization_type
+        );
+
+      case "generate_hr_dashboard":
+        const dashboardType =
+          typeof args.dashboard_type === "string"
+            ? args.dashboard_type
+            : "executive";
+        const focusDept =
+          typeof args.focus_department === "string"
+            ? args.focus_department
+            : undefined;
+        return implementations.generateHRDashboard(
+          employees,
+          dashboardType,
+          focusDept
+        );
 
       default:
         return { error: `Function ${name} not found.` };

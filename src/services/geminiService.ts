@@ -372,14 +372,14 @@
 //     return "Sorry, I encountered an error. The model might be unable to use the tools correctly for this query. Please try rephrasing your question.";
 //   }
 // };
-
 import { GoogleGenAI, Chat } from "@google/genai";
-import type { Employee } from "@/lib/types";
+import type { Employee, ChartData, DashboardData } from "@/lib/types";
 import { toolDefinitions } from "@/lib/tools/definitions";
 import { executeTool } from "@/lib/tools/executor";
 
 const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY! });
 
+// Enhanced system instruction with chart capabilities
 const systemInstruction = `You are a world-class, expert HR AI assistant. Your role is to analyze employee data using the provided tools and answer questions with insightful, data-driven accuracy.
 
 KEY RULES:
@@ -394,14 +394,43 @@ AVAILABLE CAPABILITIES:
 - Analytics: attrition, high performers, rankings, risk assessment
 - HR recommendations: promotions, training, performance reviews
 - Department statistics and comparisons
-- **Promotion analysis**: recently promoted employees, promotion eligibility, promotion analytics
+- Promotion analysis: recently promoted employees, promotion eligibility, promotion analytics
+- **INSIGHT GENERATION**: Performance patterns, attrition analysis, training impact, comprehensive reporting
+- **CHART GENERATION**: Performance charts, department comparisons, attrition analysis, training impact, HR dashboards
 
-PROMOTION GUIDELINES:
-- For "recently promoted" queries, use get_recently_promoted_employees with years=1
-- For promotion eligibility, use get_employees_eligible_for_promotion
-- For promotion trends, use get_promotion_analytics
-- Consider years_since_last_promotion = 0 or 1 as recently promoted`;
+CHART AND INSIGHT GUIDELINES:
+- For "show me a chart" or "visualize" requests → use chart generation functions
+- For "what patterns do you see" questions → use insight generation functions
+- For "dashboard" or "report" requests → use comprehensive reporting functions
+- Always provide both visual data AND actionable insights together
+- When generating charts, include insights and recommendations in the response
 
+RESPONSE FORMAT FOR CHARTS:
+When generating charts, structure your response as JSON with this format:
+{
+  "text": "Brief description of what the chart shows",
+  "chartData": {
+    "type": "bar|line|pie|radar|doughnut",
+    "title": "Chart Title",
+    "description": "Chart description",
+    "chartConfig": { ...Chart.js configuration... },
+    "insights": ["Key insight 1", "Key insight 2"],
+    "recommendations": ["Recommendation 1", "Recommendation 2"]
+  }
+}
+
+RESPONSE FORMAT FOR DASHBOARDS:
+{
+  "text": "Executive summary of the dashboard",
+  "dashboardData": {
+    "type": "executive|department|comprehensive",
+    "focus": "Company-wide or specific department",
+    "metrics": { "key_metric": value },
+    "charts": [ ...array of chart data... ],
+    "alerts": ["Alert 1", "Alert 2"],
+    "recommendations": ["Recommendation 1", "Recommendation 2"]
+  }
+}`;
 
 export class ChatbotService {
   private chat: Chat;
@@ -486,4 +515,154 @@ export class ChatbotService {
 }
 
 // ✅ Singleton instance
-export const getChatbotResponse = new ChatbotService();
+export const chatbotService = new ChatbotService();
+
+// Helper function to detect if the query is asking for charts/insights
+const isChartQuery = (query: string): boolean => {
+  const chartKeywords = [
+    'chart', 'graph', 'visualize', 'plot', 'diagram',
+    'dashboard', 'report', 'analytics', 'insights',
+    'show me', 'display', 'compare', 'trend',
+    'bar chart', 'line chart', 'pie chart', 'radar chart',
+    'visualization', 'graphical', 'plotting'
+  ];
+  return chartKeywords.some(keyword => 
+    query.toLowerCase().includes(keyword)
+  );
+};
+
+const isInsightQuery = (query: string): boolean => {
+  const insightKeywords = [
+    'insight', 'analysis', 'pattern', 'trend',
+    'correlation', 'benchmark', 'comparison',
+    'what patterns', 'why are', 'how does',
+    'recommendation', 'suggestion', 'report',
+    'summary', 'overview', 'findings'
+  ];
+  return insightKeywords.some(keyword => 
+    query.toLowerCase().includes(keyword)
+  );
+};
+
+// Enhanced response parser to extract chart data from AI responses
+const parseAIResponseForCharts = (response: string): { text: string; chartData?: ChartData | DashboardData } => {
+  // Try to find JSON in the response
+  const jsonMatch = response.match(/\{[\s\S]*\}/);
+  
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      
+      // Check if it's a chart response
+      if (parsed.chartData || parsed.dashboardData) {
+        const text = parsed.text || "Here's the visualization you requested:";
+        const chartData = parsed.chartData || parsed.dashboardData;
+        
+        return { text, chartData };
+      }
+    } catch (error) {
+      console.log("Response is not valid JSON, returning as text");
+    }
+  }
+  
+  // Check for specific patterns that indicate chart data
+  if (response.includes('"type"') && response.includes('"chartConfig"')) {
+    try {
+      // Try to extract just the chart data part
+      const chartStart = response.indexOf('{');
+      const chartEnd = response.lastIndexOf('}') + 1;
+      const chartString = response.slice(chartStart, chartEnd);
+      const parsedChart = JSON.parse(chartString);
+      
+      if (parsedChart.type && parsedChart.chartConfig) {
+        return {
+          text: "Here's the chart you requested:",
+          chartData: parsedChart
+        };
+      }
+    } catch (error) {
+      console.log("Could not extract chart data from response");
+    }
+  }
+  
+  // Return regular text response
+  return { text: response };
+};
+
+// Main enhanced chatbot function
+export const getEnhancedChatbotResponse = async (
+  query: string,
+  employees: Employee[]
+): Promise<{ text: string; chartData?: ChartData | DashboardData }> => {
+  try {
+    // Check if this is a chart/insight query
+    if (isChartQuery(query) || isInsightQuery(query)) {
+      console.log("Detected chart/insight query:", query);
+      
+      // Add specific instructions for chart generation
+      const enhancedQuery = `${query}
+
+Please structure your response with chart data in JSON format including:
+- chartConfig with type, data, and options
+- insights and recommendations
+- proper titles and descriptions`;
+
+      // Use the enhanced chatbot service
+      const response = await chatbotService.getResponse(enhancedQuery, employees);
+      
+      // Parse the response to extract chart data
+      return parseAIResponseForCharts(response);
+    } else {
+      // Regular text response
+      const response = await chatbotService.getResponse(query, employees);
+      return { text: response };
+    }
+  } catch (error) {
+    console.error("Error in enhanced chatbot:", error);
+    return { 
+      text: "Sorry, I encountered an error processing your request. Please try again." 
+    };
+  }
+};
+
+// Alternative: Direct chart generation function
+export const generateChartResponse = async (
+  query: string,
+  employees: Employee[]
+): Promise<{ text: string; chartData?: ChartData | DashboardData }> => {
+  try {
+    // Force chart generation by being more specific
+    const chartQuery = `Generate a chart or visualization for: "${query}"
+    
+Please provide your response in this exact JSON format:
+{
+  "text": "Brief description of the chart",
+  "chartData": {
+    "type": "bar|line|pie|radar|doughnut",
+    "title": "Descriptive Title",
+    "description": "What this chart shows",
+    "chartConfig": {
+      "type": "bar|line|pie|radar|doughnut",
+      "data": {
+        "labels": ["Label1", "Label2"],
+        "datasets": [{"label": "Dataset", "data": [1, 2]}]
+      },
+      "options": {
+        "responsive": true,
+        "plugins": {"title": {"display": true, "text": "Title"}}
+      }
+    },
+    "insights": ["Key finding 1", "Key finding 2"],
+    "recommendations": ["Actionable recommendation 1", "Actionable recommendation 2"]
+  }
+}`;
+
+    const response = await chatbotService.getResponse(chartQuery, employees);
+    return parseAIResponseForCharts(response);
+  } catch (error) {
+    console.error("Error in chart generation:", error);
+    return { 
+      text: "Sorry, I couldn't generate a chart for your request. Please try again." 
+    };
+  }
+};

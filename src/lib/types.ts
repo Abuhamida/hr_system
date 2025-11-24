@@ -73,3 +73,33 @@ export type InsertEmployee = Omit<Employee, 'id' | 'created_at'>;
 export type InsertChatSession = Omit<ChatSession, 'id' | 'created_at'>;
 export type InsertChatMessage = Omit<ChatMessage, 'id' | 'created_at'>;
 export type InsertKnowledgeBaseEntry = Omit<KnowledgeBaseEntry, 'id' | 'created_at'>;
+
+
+export interface ChartData {
+  type: 'bar' | 'line' | 'pie' | 'radar' | 'doughnut';
+  title: string;
+  description: string;
+  chartConfig: any;
+  insights: string[];
+  recommendations: string[];
+  rawData?: any;
+}
+
+export interface DashboardData {
+  type: string;
+  focus: string;
+  metrics: Record<string, number>;
+  charts: ChartData[];
+  alerts: string[];
+  recommendations: string[];
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: 'user' | 'ai';
+  content: string;
+  timestamp: Date;
+  loading?: boolean;
+  chartData?: ChartData | DashboardData; // Add this for chart messages
+  isChart?: boolean; // Add this to identify chart messages
+}

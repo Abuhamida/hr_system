@@ -26,6 +26,7 @@ import type { UserRole } from '@/lib/auth-utils';
 const navigationItems = [
   { icon: Home, label: 'Overview', href: '/dashboard', roles: ['admin', 'employee'] },
   { icon: Users, label: 'Employees', href: '/dashboard/employees', roles: ['admin'] },
+  { icon: MessageSquare, label: 'Prediction', href: '/dashboard/prediction', roles: ['admin', ] },
   { icon: MessageSquare, label: 'AI Chat', href: '/dashboard/chat', roles: ['admin', 'employee'] },
   { icon: User, label: 'My Profile', href: '/dashboard/profile', roles: ['admin', 'employee'] },
   { icon: Settings, label: 'Settings', href: '/dashboard/settings', roles: ['admin', 'employee'] },
@@ -246,13 +247,14 @@ export default function DashboardLayout({
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Role indicator in header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-3">
+        <div className="bg-white border-b border-gray-200 px-6 py-[17px]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h1 className="text-lg font-semibold text-gray-900">
                 {pathname === '/dashboard' && 'Overview'}
                 {pathname === '/dashboard/employees' && 'Employee Management'}
                 {pathname === '/dashboard/analytics' && 'HR Analytics'}
+                {pathname === '/dashboard/prediction' && 'HR Prediction'}
                 {pathname === '/dashboard/chat' && 'AI Assistant'}
                 {pathname === '/dashboard/profile' && 'My Profile'}
                 {pathname === '/dashboard/settings' && 'Settings'}

@@ -67,6 +67,7 @@ export async function middleware(request: NextRequest) {
     // Define admin-only routes
     const adminOnlyRoutes = [
       '/dashboard/employees',
+      '/dashboard/prediction'
     ]
 
     const isAdminOnlyRoute = adminOnlyRoutes.some(route => 

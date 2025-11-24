@@ -215,6 +215,189 @@ export const toolDefinitions = [
           required: ["department"],
         },
       },
+
+      {
+        name: "generate_performance_insights",
+        description:
+          "Generate deep insights about employee performance patterns and correlations.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            focus_department: {
+              type: Type.STRING,
+              description: "Specific department to analyze (optional).",
+            },
+            analysis_type: {
+              type: Type.STRING,
+              description:
+                "Type of analysis: 'trends', 'correlations', 'benchmarks', 'root_causes'.",
+              enum: ["trends", "correlations", "benchmarks", "root_causes"],
+            },
+          },
+        },
+      },
+      {
+        name: "generate_attrition_insights",
+        description:
+          "Generate insights about employee attrition patterns and risk factors.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            depth: {
+              type: Type.STRING,
+              description:
+                "Depth of analysis: 'quick', 'comprehensive', 'predictive'.",
+              enum: ["quick", "comprehensive", "predictive"],
+            },
+          },
+        },
+      },
+      {
+        name: "generate_training_impact_insights",
+        description:
+          "Analyze the impact of training on employee performance and satisfaction.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            min_training_sessions: {
+              type: Type.INTEGER,
+              description:
+                "Minimum training sessions to consider for analysis.",
+            },
+          },
+        },
+      },
+      {
+        name: "generate_workforce_optimization_insights",
+        description:
+          "Generate strategic insights for workforce planning and optimization.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            timeframe: {
+              type: Type.STRING,
+              description:
+                "Timeframe for planning: 'short_term', 'medium_term', 'long_term'.",
+              enum: ["short_term", "medium_term", "long_term"],
+            },
+          },
+        },
+      },
+      {
+        name: "generate_comprehensive_hr_report",
+        description:
+          "Generate a comprehensive HR insights report with key metrics and recommendations.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            report_type: {
+              type: Type.STRING,
+              description:
+                "Type of report: 'executive', 'departmental', 'strategic', 'operational'.",
+              enum: ["executive", "departmental", "strategic", "operational"],
+            },
+          },
+        },
+      },
+      {
+        name: "generate_performance_charts",
+        description:
+          "Generate charts and visualizations for performance data across departments and roles.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            chart_type: {
+              type: Type.STRING,
+              description:
+                "Type of chart: 'bar', 'line', 'pie', 'radar', 'comparison'.",
+              enum: ["bar", "line", "pie", "radar", "comparison"],
+            },
+            metric: {
+              type: Type.STRING,
+              description:
+                "Metric to visualize: 'performance', 'satisfaction', 'attrition', 'training'.",
+            },
+          },
+          required: ["chart_type", "metric"],
+        },
+      },
+      {
+        name: "generate_department_comparison_chart",
+        description: "Create comparison charts across different departments.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            metrics: {
+              type: Type.ARRAY,
+              description: "Array of metrics to compare.",
+              items: {
+                type: Type.STRING,
+              },
+            },
+            chart_style: {
+              type: Type.STRING,
+              description: "Chart style: 'side_by_side', 'stacked', 'radar'.",
+              enum: ["side_by_side", "stacked", "radar"],
+            },
+          },
+          required: ["metrics"],
+        },
+      },
+      {
+        name: "generate_attrition_analysis_chart",
+        description:
+          "Create visualizations for attrition patterns and risk factors.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            analysis_type: {
+              type: Type.STRING,
+              description:
+                "Type of analysis: 'trends', 'factors', 'predictive', 'departmental'.",
+              enum: ["trends", "factors", "predictive", "departmental"],
+            },
+          },
+          required: ["analysis_type"],
+        },
+      },
+      {
+        name: "generate_training_impact_chart",
+        description:
+          "Visualize training impact on performance and satisfaction.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            visualization_type: {
+              type: Type.STRING,
+              description:
+                "Type of visualization: 'correlation', 'before_after', 'roi', 'department_gaps'.",
+              enum: ["correlation", "before_after", "roi", "department_gaps"],
+            },
+          },
+          required: ["visualization_type"],
+        },
+      },
+      {
+        name: "generate_hr_dashboard",
+        description:
+          "Generate a complete HR dashboard with multiple charts and metrics.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            dashboard_type: {
+              type: Type.STRING,
+              description:
+                "Type of dashboard: 'executive', 'department', 'comprehensive'.",
+              enum: ["executive", "department", "comprehensive"],
+            },
+            focus_department: {
+              type: Type.STRING,
+              description:
+                "Specific department for department dashboard (optional).",
+            },
+          },
+        },
+      },
     ],
   },
 ];

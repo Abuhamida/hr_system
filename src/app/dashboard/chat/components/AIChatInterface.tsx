@@ -2,11 +2,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Bot, User, Plus, Trash2, Loader2, Brain } from 'lucide-react';
+import { Send, Bot, User, Plus, Trash2, Loader2, Brain, BarChart3 } from 'lucide-react';
 import type { Employee, ChatSession, ChatMessage as ChatMessageType } from '@/lib/types';
-import { getChatbotResponse } from '@/services/geminiService';
+import { getEnhancedChatbotResponse } from '@/services/geminiService'; // Updated import
 import { createClient } from '@/lib/supabase/client';
-
+import { ChartMessage } from './ChartMessage';
 interface AIChatInterfaceProps {
   currentEmployee: Employee | null;
   initialSessions: ChatSession[];
@@ -19,6 +19,8 @@ interface ChatMessage {
   content: string;
   timestamp: Date;
   loading?: boolean;
+  chartData?: any; // Add chart data
+  isChart?: boolean; // Add flag for chart messages
 }
 
 export default function AIChatInterface({
@@ -133,8 +135,8 @@ export default function AIChatInterface({
     setMessages((prev) => [...prev, aiLoadingMessage]);
 
     try {
-      // Get AI response using your existing service
-      const response = await getChatbotResponse.getResponse(userMessage, employees);
+      // Get AI response using ENHANCED service (includes charts)
+      const response = await getEnhancedChatbotResponse(userMessage, employees);
 
       // Remove loading message
       setMessages((prev) => prev.filter((msg) => !msg.loading));
@@ -145,19 +147,22 @@ export default function AIChatInterface({
         .insert({
           session_id: selectedSession.id,
           sender: 'ai',
-          message: response,
+          message: response.text, // Save text response
+          metadata: response.chartData ? { chartData: response.chartData } : null, // Save chart data in metadata
         })
         .select()
         .single();
 
       if (aiMessageError) throw aiMessageError;
 
-      // Add AI message to UI
+      // Add AI message to UI (with chart data if available)
       const aiMessageObj: ChatMessage = {
         id: aiMessageData.id,
         sender: 'ai',
-        content: response,
+        content: response.text,
         timestamp: new Date(aiMessageData.created_at),
+        chartData: response.chartData,
+        isChart: !!response.chartData,
       };
 
       setMessages((prev) => [...prev, aiMessageObj]);
@@ -189,7 +194,7 @@ export default function AIChatInterface({
     }
   };
 
-  // Load messages when session changes
+  // Load messages when session changes (updated to handle chart data)
   useEffect(() => {
     if (!selectedSession) {
       setMessages([]);
@@ -213,6 +218,8 @@ export default function AIChatInterface({
         sender: msg.sender as 'user' | 'ai',
         content: msg.message,
         timestamp: new Date(msg.created_at),
+        chartData: msg.metadata?.chartData,
+        isChart: !!msg.metadata?.chartData,
       }));
 
       setMessages(formattedMessages);
@@ -235,10 +242,41 @@ export default function AIChatInterface({
     }
   };
 
+  // Updated message rendering to handle charts
+  const renderMessageContent = (message: ChatMessage) => {
+    if (message.loading) {
+      return (
+        <div className="flex items-center space-x-2">
+          <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse"></div>
+          <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse delay-75"></div>
+          <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse delay-150"></div>
+        </div>
+      );
+    }
+
+    if (message.isChart && message.chartData) {
+      return <ChartMessage data={message.chartData} />;
+    }
+
+    return <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>;
+  };
+
+  // Updated quick suggestions to include chart examples
+  const quickSuggestions = [
+    "List employees with attrition risk",
+    "Show employee performance rankings", 
+    "Get details for employee #1001",
+    "Suggest HR actions for my team",
+    "📊 Show performance bar chart by department",
+    "📈 Visualize attrition trends",
+    "📋 Generate HR analytics dashboard",
+    "🔍 Compare departments with radar chart"
+  ];
+
   if (isInitializing) {
     return (
       <div className="bg-white/70 backdrop-blur-sm rounded-xl border border-gray-200 shadow-md flex flex-col h-[calc(100vh-12rem)]">
-        <div className="flex-grow flex items-center justify-center">
+        <div className="grow flex items-center justify-center">
           <div className="text-center">
             <Loader2 className="w-8 h-8 text-primary-600 animate-spin mx-auto mb-4" />
             <p className="text-gray-600">Initializing chat...</p>
@@ -249,7 +287,7 @@ export default function AIChatInterface({
   }
 
   return (
-    <div className="flex h-[calc(100vh-12rem)] bg-white/70 backdrop-blur-sm rounded-xl border border-gray-200 shadow-md">
+    <div className="flex h-full">
       {/* Sidebar - Chat History */}
       <div className="w-80 border-r border-gray-200 flex flex-col">
         <div className="p-4 border-b border-gray-200">
@@ -292,9 +330,6 @@ export default function AIChatInterface({
                       <div className="font-medium text-gray-900 truncate">
                         {session.title || "New Chat"}
                       </div>
-                      {/* <div className="text-xs text-gray-500 truncate">
-                        {session.chat_messages?.[0]?.message || "No messages yet"}
-                      </div> */}
                     </div>
                     <button
                       onClick={(e) => {
@@ -329,7 +364,7 @@ export default function AIChatInterface({
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">HR AI Agent</h3>
-                  <p className="text-sm text-gray-600">Ask me anything about your employee data</p>
+                  <p className="text-sm text-gray-600">Ask me anything about your employee data - now with charts & insights!</p>
                 </div>
               </motion.div>
             </div>
@@ -340,20 +375,20 @@ export default function AIChatInterface({
                 {messages.length === 0 ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center max-w-md">
-                      <Bot className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                      <div className="flex justify-center mb-4">
+                        <div className="relative">
+                          <Bot className="w-16 h-16 text-gray-300" />
+                          <BarChart3 className="w-8 h-8 text-primary-500 absolute -bottom-1 -right-1" />
+                        </div>
+                      </div>
                       <h3 className="text-lg font-semibold text-gray-900 mb-2">
                         How can I help you today?
                       </h3>
                       <p className="text-gray-600 mb-6">
-                        Ask me about HR policies, employee information, company data, or anything else related to your workplace.
+                        Ask me about HR data, request charts and visualizations, or get insights about your workforce.
                       </p>
                       <div className="grid grid-cols-2 gap-3 text-sm">
-                        {[
-                          "List employees with attrition risk",
-                          "Show employee performance rankings",
-                          "Get details for employee #1001",
-                          "Suggest HR actions for my team",
-                        ].map((suggestion, index) => (
+                        {quickSuggestions.map((suggestion, index) => (
                           <motion.button
                             key={index}
                             whileHover={{ scale: 1.02 }}
@@ -376,30 +411,28 @@ export default function AIChatInterface({
                       transition={{ duration: 0.3, delay: index * 0.1 }}
                       className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div className={`flex gap-3 max-w-xs md:max-w-md lg:max-w-lg ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                      <div className={`flex gap-3 max-w-full ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'} ${
+                        message.isChart ? 'w-full' : 'max-w-xs md:max-w-md lg:max-w-lg'
+                      }`}>
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                           message.sender === 'user' ? 'bg-primary-600' : 'bg-gray-200'
                         }`}>
                           {message.sender === 'user' ? (
                             <User className="w-4 h-4 text-white" />
+                          ) : message.isChart ? (
+                            <BarChart3 className="w-4 h-4 text-gray-600" />
                           ) : (
                             <Bot className="w-4 h-4 text-gray-600" />
                           )}
                         </div>
-                        <div className={`px-4 py-3 rounded-2xl ${
+                        <div className={`${message.isChart ? 'flex-1' : ''} ${
                           message.sender === 'user' 
                             ? 'bg-primary-600 text-white rounded-br-none' 
+                            : message.isChart
+                            ? 'bg-transparent'
                             : 'bg-gray-100 text-gray-800 rounded-bl-none'
-                        }`}>
-                          {message.loading ? (
-                            <div className="flex items-center space-x-2">
-                              <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse"></div>
-                              <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse delay-75"></div>
-                              <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse delay-150"></div>
-                            </div>
-                          ) : (
-                            <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                          )}
+                        } ${!message.isChart ? 'px-4 py-3 rounded-2xl' : ''}`}>
+                          {renderMessageContent(message)}
                         </div>
                       </div>
                     </motion.div>
@@ -420,7 +453,7 @@ export default function AIChatInterface({
                   <textarea
                     rows={1}
                     className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-gray-50 dark:border-gray-200 dark:text-gray-900 resize-none"
-                    placeholder="e.g., 'List employees with attrition risk'"
+                    placeholder="e.g., 'Show me a performance chart by department'"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyPress={handleKeyPress}

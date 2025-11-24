@@ -283,3 +283,8 @@ export const getPromotionAnalytics = (employees: Employee[], department?: string
     department_breakdown: departmentRates,
   };
 };
+
+// Re-export insight implementations
+export * from './insightImplementations';
+// Re-export chart implementations
+export * from './chartImplementations';
