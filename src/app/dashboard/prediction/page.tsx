@@ -4,7 +4,6 @@ import { useState } from "react";
 import { InferenceSession, Tensor, env } from "onnxruntime-web";
 
 // important: tell ort where the wasm files are
-env.wasm.wasmPaths = "/model/";
 
 export default function PredictionPage() {
   const [formData, setFormData] = useState<Record<string, string | number>>({
