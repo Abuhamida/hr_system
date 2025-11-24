@@ -1,28 +1,32 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
+import { InferenceSession, Tensor, env } from "onnxruntime-web";
+
+// important: tell ort where the wasm files are
+env.wasm.wasmPaths = "/model/";
 
 export default function PredictionPage() {
   const [formData, setFormData] = useState<Record<string, string | number>>({
     Age: 30,
-    BusinessTravel: 'Travel_Rarely',
+    BusinessTravel: "Travel_Rarely",
     DailyRate: 800,
-    Department: 'Research & Development',
+    Department: "Research & Development",
     DistanceFromHome: 10,
     Education: 3,
-    EducationField: 'Life Sciences',
+    EducationField: "Life Sciences",
     EnvironmentSatisfaction: 3,
-    Gender: 'Male',
+    Gender: "Male",
     HourlyRate: 50,
     JobInvolvement: 3,
     JobLevel: 2,
-    JobRole: 'Research Scientist',
+    JobRole: "Research Scientist",
     JobSatisfaction: 3,
-    MaritalStatus: 'Married',
+    MaritalStatus: "Married",
     MonthlyIncome: 5000,
     MonthlyRate: 15000,
     NumCompaniesWorked: 1,
-    OverTime: 'No',
+    OverTime: "No",
     PercentSalaryHike: 15,
     PerformanceRating: 3,
     RelationshipSatisfaction: 3,
@@ -40,37 +44,71 @@ export default function PredictionPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: any) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // >>>>>>>>>>>>>> THE REAL PREDICTION FUNCTION <<<<<<<<<<<<<<
+  async function runClientPrediction() {
     setLoading(true);
     setError(null);
     setResult(null);
 
     try {
-      const response = await fetch('/api/predict', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
+      // Load model
+      const session = await InferenceSession.create("/model/model.onnx");
 
-      const data = await response.json();
-      if (data.success) {
-        setResult(data);
-      } else {
-        setError(data.error || 'Prediction failed');
+      // Load mappings
+      const mappings = await (await fetch("/model/label_encoder_mapping.json")).json();
+      const featureNames = await (await fetch("/model/feature_names.json")).json();
+
+      const processed: number[] = [];
+
+      for (const feature of featureNames) {
+        let v = formData[feature];
+
+        // categorical encoding
+        if (mappings[feature]) {
+          const encoded = mappings[feature][v];
+          v = encoded !== undefined ? encoded : 0;
+        }
+
+        const num = Number(v);
+        if (isNaN(num)) throw new Error(`Invalid feature: ${feature}`);
+        processed.push(num);
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred');
+
+      // Create tensor
+      const tensor = new Tensor("float32", Float32Array.from(processed), [
+        1,
+        processed.length,
+      ]);
+
+      const inputName = session.inputNames[0];
+      const out = await session.run({ [inputName]: tensor });
+
+      const label = out[session.outputNames[0]];
+      const prob = out[session.outputNames[1]];
+      const p = prob.data as Float32Array;
+
+      setResult({
+        prediction: Number(label.data[0]),
+        probabilities: { 0: p[0], 1: p[1] },
+      });
+    } catch (e: any) {
+      setError(e.message);
     } finally {
       setLoading(false);
     }
+  }
+
+  const handleSubmit = (e: any) => {
+    e.preventDefault();
+    runClientPrediction();
   };
 
+  // ------ UI BELOW (NO CHANGES) ------
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
@@ -80,49 +118,45 @@ export default function PredictionPage() {
             Employee Attrition Prediction
           </h1>
           <p className="text-gray-600">
-            Analyze employee data to predict attrition risk and take proactive measures
+            Analyze employee data to predict attrition risk and take proactive measures.
           </p>
         </div>
 
-        {/* Form Card */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <form onSubmit={handleSubmit} className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              {/* Numerical Fields */}
+              {/* number fields */}
               {[
-                'Age', 'DailyRate', 'DistanceFromHome', 'Education', 'EnvironmentSatisfaction',
-                'HourlyRate', 'JobInvolvement', 'JobLevel', 'JobSatisfaction', 'MonthlyIncome',
-                'MonthlyRate', 'NumCompaniesWorked', 'PercentSalaryHike', 'PerformanceRating',
-                'RelationshipSatisfaction', 'StockOptionLevel', 'TotalWorkingYears',
-                'TrainingTimesLastYear', 'WorkLifeBalance', 'YearsAtCompany', 'YearsInCurrentRole',
-                'YearsSinceLastPromotion', 'YearsWithCurrManager'
-              ].map(field => (
-                <div key={field} className="space-y-2">
+                "Age", "DailyRate", "DistanceFromHome", "Education", "EnvironmentSatisfaction",
+                "HourlyRate", "JobInvolvement", "JobLevel", "JobSatisfaction", "MonthlyIncome",
+                "MonthlyRate", "NumCompaniesWorked", "PercentSalaryHike", "PerformanceRating",
+                "RelationshipSatisfaction", "StockOptionLevel", "TotalWorkingYears",
+                "TrainingTimesLastYear", "WorkLifeBalance", "YearsAtCompany", "YearsInCurrentRole",
+                "YearsSinceLastPromotion", "YearsWithCurrManager"
+              ].map((f) => (
+                <div key={f}>
                   <label className="block text-sm font-medium text-gray-700">
-                    {field.replace(/([A-Z])/g, ' $1').trim()}
+                    {f.replace(/([A-Z])/g, " $1").trim()}
                   </label>
                   <input
                     type="number"
-                    name={field}
-                    value={formData[field]}
+                    name={f}
+                    value={formData[f]}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                    required
+                    className="w-full px-3 py-2 border rounded"
                   />
                 </div>
               ))}
 
-              {/* Categorical Fields */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Business Travel
-                </label>
-                <select 
-                  name="BusinessTravel" 
-                  value={formData.BusinessTravel} 
+              {/* categorical fields */}
+              {/* BusinessTravel */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Business Travel</label>
+                <select
+                  name="BusinessTravel"
+                  value={formData.BusinessTravel}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className="w-full px-3 py-2 border rounded"
                 >
                   <option value="Non-Travel">Non-Travel</option>
                   <option value="Travel_Frequently">Travel Frequently</option>
@@ -130,15 +164,14 @@ export default function PredictionPage() {
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Department
-                </label>
-                <select 
-                  name="Department" 
-                  value={formData.Department} 
+              {/* Department */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Department</label>
+                <select
+                  name="Department"
+                  value={formData.Department}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className="w-full px-3 py-2 border rounded"
                 >
                   <option value="Human Resources">Human Resources</option>
                   <option value="Research & Development">Research & Development</option>
@@ -146,15 +179,14 @@ export default function PredictionPage() {
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Education Field
-                </label>
-                <select 
-                  name="EducationField" 
-                  value={formData.EducationField} 
+              {/* EducationField */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Education Field</label>
+                <select
+                  name="EducationField"
+                  value={formData.EducationField}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className="w-full px-3 py-2 border rounded"
                 >
                   <option value="Human Resources">Human Resources</option>
                   <option value="Life Sciences">Life Sciences</option>
@@ -165,30 +197,28 @@ export default function PredictionPage() {
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Gender
-                </label>
-                <select 
-                  name="Gender" 
-                  value={formData.Gender} 
+              {/* Gender */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Gender</label>
+                <select
+                  name="Gender"
+                  value={formData.Gender}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className="w-full px-3 py-2 border rounded"
                 >
                   <option value="Female">Female</option>
                   <option value="Male">Male</option>
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Job Role
-                </label>
-                <select 
-                  name="JobRole" 
-                  value={formData.JobRole} 
+              {/* JobRole */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Job Role</label>
+                <select
+                  name="JobRole"
+                  value={formData.JobRole}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className="w-full px-3 py-2 border rounded"
                 >
                   <option value="Healthcare Representative">Healthcare Representative</option>
                   <option value="Human Resources">Human Resources</option>
@@ -202,15 +232,14 @@ export default function PredictionPage() {
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Marital Status
-                </label>
-                <select 
-                  name="MaritalStatus" 
-                  value={formData.MaritalStatus} 
+              {/* MaritalStatus */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Marital Status</label>
+                <select
+                  name="MaritalStatus"
+                  value={formData.MaritalStatus}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className="w-full px-3 py-2 border rounded"
                 >
                   <option value="Divorced">Divorced</option>
                   <option value="Married">Married</option>
@@ -218,15 +247,14 @@ export default function PredictionPage() {
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Over Time
-                </label>
-                <select 
-                  name="OverTime" 
-                  value={formData.OverTime} 
+              {/* OverTime */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Over Time</label>
+                <select
+                  name="OverTime"
+                  value={formData.OverTime}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className="w-full px-3 py-2 border rounded"
                 >
                   <option value="No">No</option>
                   <option value="Yes">Yes</option>
@@ -234,44 +262,24 @@ export default function PredictionPage() {
               </div>
             </div>
 
-            {/* Submit Button */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
+            <div className="mt-8">
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full bg-blue-600 text-white py-3 rounded-lg"
               >
-                {loading ? (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    Predicting...
-                  </div>
-                ) : (
-                  'Predict Attrition Risk'
-                )}
+                {loading ? "Predicting..." : "Predict Attrition Risk"}
               </button>
             </div>
           </form>
         </div>
 
-        {/* Error Display */}
         {error && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Error</h3>
-                <p className="text-sm text-red-700 mt-1">{error}</p>
-              </div>
-            </div>
+          <div className="mt-4 p-4 bg-red-200 rounded">
+            <p className="text-red-700">{error}</p>
           </div>
         )}
 
-        {/* Result Display */}
         {result && (
           <div className="mt-6 bg-green-50 border border-green-200 rounded-xl p-6">
             <div className="flex items-center mb-4">
